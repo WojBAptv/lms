@@ -1,14 +1,9 @@
 import { Router } from "express";
 import path from "path";
 import { v4 as uuid } from "uuid";
-import { ensureDataFile, readJson, writeJson } from "../lib/fileDb";
-import {
-  Activity,
-  ActivityCreate,
-  activityCreateSchema,
-  activitySchema,
-  posInt
-} from "../types";
+import { ensureDataFile, readJson, writeJson } from "../lib/fileDb.js";
+import { Activity, ActivityCreate, activityCreateSchema, activitySchema, posInt } from "../types.js";
+
 
 const router = Router();
 const DATA_FILE = path.resolve(process.cwd(), "data", "activities.json");
