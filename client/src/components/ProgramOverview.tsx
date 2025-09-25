@@ -1,3 +1,4 @@
+// client/src/components/ProgramOverview.tsx
 import { useEffect, useMemo, useState } from 'react';
 import type { Activity } from './Timeline';
 import Timeline from './Timeline';
@@ -7,19 +8,24 @@ import { getPrograms, getProjects, type Program, type Project } from '../lib/api
 type Props = {
   activities: Activity[];
   scale: TimeScale;
+  onChange: (uid: string, patch: Partial<Activity>) => void; // <-- NEW
 };
 
-export default function ProgramOverview({ activities, scale }: Props) {
+export default function ProgramOverview({ activities, scale, onChange }: Props) {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([getPrograms(), getProjects()]).then(([ps, prjs]) => {
-      setPrograms(ps);
-      setProjects(prjs);
-      if (ps.length) setExpanded(new Set([ps[0].id])); // open first program by default
-    });
+    setLoading(true);
+    Promise.all([getPrograms(), getProjects()])
+      .then(([ps, prjs]) => {
+        setPrograms(ps);
+        setProjects(prjs);
+        if (ps.length) setExpanded(new Set([ps[0].id])); // open first program by default
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const projectsByProgram = useMemo(() => {
@@ -52,6 +58,8 @@ export default function ProgramOverview({ activities, scale }: Props) {
     });
   }
 
+  if (loading) return <p>Loading programs & projects…</p>;
+
   return (
     <div>
       {programs.sort((a,b) => a.id - b.id).map(p => {
@@ -80,7 +88,8 @@ export default function ProgramOverview({ activities, scale }: Props) {
                   return (
                     <div key={pr.id} style={{ marginBottom: 16 }}>
                       <div style={{ margin: '8px 0' }}><strong>Project #{pr.id}</strong> — {pr.name}</div>
-                      <Timeline items={acts} scale={scale} onChange={() => { /* Level 2 view is read-only for now */ }} />
+                      {/* Level 2 now editable: same onChange as Level 1 */}
+                      <Timeline items={acts} scale={scale} onChange={onChange} />
                     </div>
                   );
                 })}
