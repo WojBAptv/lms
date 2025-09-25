@@ -1,4 +1,6 @@
+// client/src/components/Timeline.tsx
 import React, { useMemo, useRef, useState } from 'react';
+import type { TimeScale } from '../lib/timeScale';
 
 export type Activity = {
   uid: string;
@@ -15,33 +17,33 @@ export type Activity = {
 
 export type TimelineProps = {
   items: Activity[];
+  scale: TimeScale;
   onChange: (uid: string, patch: Partial<Activity>) => void;
 };
 
-const DAY_PX = 40;
+const MIN_BAR_DAYS = 1;
 
-// date helpers
+// date helpers (day granularity)
 function parseISO(iso: string): Date { const [y,m,d] = iso.split('-').map(Number); return new Date(y, m-1, d); }
 function toISO(d: Date): string { const yyyy = d.getFullYear(); const mm = String(d.getMonth()+1).padStart(2,'0'); const dd = String(d.getDate()).padStart(2,'0'); return `${yyyy}-${mm}-${dd}`; }
 function addDays(iso: string, days: number): string { const dt = parseISO(iso); dt.setDate(dt.getDate()+days); return toISO(dt); }
-function clampDate(iso: string, min: string, max: string): string { const t = parseISO(iso).getTime(); const tmin = parseISO(min).getTime(); const tmax = parseISO(max).getTime(); if (t < tmin) return min; if (t > tmax) return max; return iso; }
 function daysBetween(a: string, b: string): number { const ms = parseISO(b).getTime() - parseISO(a).getTime(); return Math.round(ms / 86400000); }
+function clampDate(iso: string, min: string, max: string): string { const t = parseISO(iso).getTime(); const tmin = parseISO(min).getTime(); const tmax = parseISO(max).getTime(); if (t < tmin) return min; if (t > tmax) return max; return iso; }
 
-export default function Timeline({ items, onChange }: TimelineProps) {
-  // window covers 6 weeks starting Monday of current week
-  const today = useMemo(() => { const d = new Date(); const dow = (d.getDay() + 6) % 7; d.setDate(d.getDate()-dow); return d; }, []);
-  const startISO = toISO(today);
-  const endISO = useMemo(() => toISO(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 41)), [today]); // ~6 weeks
-
-  const days = daysBetween(startISO, endISO) + 1;
-  const width = days * DAY_PX;
-
-  const [drag, setDrag] = useState<{ uid: string; mode: 'move'|'left'|'right'; startX: number; origStart: string; origEnd: string }|null>(null);
+export default function Timeline({ items, scale, onChange }: TimelineProps) {
   const gridRef = useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = useState<{ uid: string; mode: 'move'|'left'|'right'; startX: number; origStart: string; origEnd: string }|null>(null);
 
-  function xFromDate(iso: string): number { return daysBetween(startISO, iso) * DAY_PX; }
-  function dateFromX(px: number): string { const day = Math.round(px / DAY_PX); return addDays(startISO, day); }
+  // total width in pixels based on ticks
+  const width = useMemo(() => {
+    if (scale.mode === 'day') return scale.ticks.length * scale.unitPx;
+    if (scale.mode === 'week') return scale.ticks.length * scale.unitPx;
+    return scale.ticks.length * scale.unitPx; // months
+  }, [scale]);
 
+  function xFromDate(iso: string): number { return scale.dateToX(iso); }
+
+  // day-based drag: we still adjust by whole days; snapping refinements can come later
   function onPointerDown(e: React.PointerEvent, uid: string, mode: 'move'|'left'|'right', start: string, end: string) {
     (e.target as Element).setPointerCapture(e.pointerId);
     setDrag({ uid, mode, startX: e.clientX, origStart: start, origEnd: end });
@@ -49,22 +51,25 @@ export default function Timeline({ items, onChange }: TimelineProps) {
   function onPointerMove(e: React.PointerEvent) {
     if (!drag) return;
     const dx = e.clientX - drag.startX;
-    const deltaDays = Math.round(dx / DAY_PX);
+    const deltaUnits = Math.round(dx / scale.unitPx); // move by units
+    const deltaDays = Math.max(1, scale.mode === 'day' ? 1 : scale.mode === 'week' ? 7 : 30) * deltaUnits;
+
     if (deltaDays === 0) return;
+
     if (drag.mode === 'move') {
-      const nextStart = clampDate(addDays(drag.origStart, deltaDays), startISO, endISO);
+      const nextStart = clampDate(addDays(drag.origStart, deltaDays), scale.startISO, scale.endISO);
       const duration = daysBetween(drag.origStart, drag.origEnd);
-      const nextEnd = clampDate(addDays(nextStart, duration), startISO, endISO);
+      const nextEnd = clampDate(addDays(nextStart, duration), scale.startISO, scale.endISO);
       onChange(drag.uid, { start: nextStart, end: nextEnd } as any);
     } else if (drag.mode === 'left') {
-      const next = clampDate(addDays(drag.origStart, deltaDays), startISO, endISO);
-      const minStart = addDays(drag.origEnd, -1);
-      const safe = daysBetween(next, drag.origEnd) >= 1 ? next : minStart;
+      const next = clampDate(addDays(drag.origStart, deltaDays), scale.startISO, scale.endISO);
+      const minStart = addDays(drag.origEnd, -MIN_BAR_DAYS);
+      const safe = daysBetween(next, drag.origEnd) >= MIN_BAR_DAYS ? next : minStart;
       onChange(drag.uid, { start: safe } as any);
     } else if (drag.mode === 'right') {
-      const next = clampDate(addDays(drag.origEnd, deltaDays), startISO, endISO);
-      const minEnd = addDays(drag.origStart, 1);
-      const safe = daysBetween(drag.origStart, next) >= 1 ? next : minEnd;
+      const next = clampDate(addDays(drag.origEnd, deltaDays), scale.startISO, scale.endISO);
+      const minEnd = addDays(drag.origStart, MIN_BAR_DAYS);
+      const safe = daysBetween(drag.origStart, next) >= MIN_BAR_DAYS ? next : minEnd;
       onChange(drag.uid, { end: safe } as any);
     }
   }
@@ -76,14 +81,12 @@ export default function Timeline({ items, onChange }: TimelineProps) {
   return (
     <div className="timeline">
       <div className="header" style={{ display: 'flex' }}>
-        {Array.from({ length: days }).map((_, i) => {
-          const date = addDays(startISO, i);
-          return (
-            <div key={i} className="cell head" style={{ width: DAY_PX, borderRight: '1px solid #e5e7eb', textAlign: 'center', fontSize: 12 }}>
-              {date.slice(5)}
-            </div>
-          );
-        })}
+        {scale.ticks.map((t, i) => (
+          <div key={i} className="cell head"
+               style={{ width: scale.unitPx, borderRight: '1px solid #e5e7eb', textAlign: 'center', fontSize: 12 }}>
+            {t.label}
+          </div>
+        ))}
       </div>
 
       <div
@@ -98,14 +101,15 @@ export default function Timeline({ items, onChange }: TimelineProps) {
           border: '1px solid #e5e7eb',
           height: 40 * Math.max(1, items.length),
           backgroundImage: `linear-gradient(to right, #f3f4f6 1px, transparent 1px)`,
-          backgroundSize: `${DAY_PX}px 100%`,
+          backgroundSize: `${scale.unitPx}px 100%`,
           overflowX: 'auto'
         }}
       >
         {items.map((a, row) => {
+          // inclusive end: add 1 day visually in day mode; for week/month, we rely on coarse snapping via deltaDays
           const left = xFromDate(a.start);
-          const right = xFromDate(a.end) + DAY_PX; // inclusive end cell
-          const w = Math.max(DAY_PX, right - left);
+          const right = xFromDate(addDays(a.end, 1));
+          const w = Math.max(scale.unitPx, right - left);
           return (
             <div key={a.uid}
               className="bar"
