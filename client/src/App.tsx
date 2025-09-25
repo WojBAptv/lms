@@ -16,6 +16,8 @@ import { useToast } from "@/components/ui/use-toast";
 // If you created the Styleguide page in src/pages (Option A):
 import Styleguide from "./pages/Styleguide";
 
+import { Button } from "@/components/ui/button";
+
 // Small shared toolbar for zoom + window info
 function ZoomToolbar({
   mode,
@@ -31,15 +33,15 @@ function ZoomToolbar({
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
       <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-        <button onClick={() => setMode("day")} disabled={mode === "day"}>
+        <Button variant={mode === "day" ? "default" : "outline"} onClick={() => setMode("day")} disabled={mode === "day"}>
           Day
-        </button>
-        <button onClick={() => setMode("week")} disabled={mode === "week"}>
+        </Button>
+        <Button variant={mode === "week" ? "default" : "outline"} onClick={() => setMode("week")} disabled={mode === "week"}>
           Week
-        </button>
-        <button onClick={() => setMode("month")} disabled={mode === "month"}>
+        </Button>
+        <Button variant={mode === "month" ? "default" : "outline"} onClick={() => setMode("month")} disabled={mode === "month"}>
           Month
-        </button>
+        </Button>
       </div>
       <span style={{ marginLeft: 12, color: "#6b7280" }}>
         Window: {startISO} → {endISO} (mode: {mode})

@@ -3,6 +3,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { getCapacityForecast, type CapacityPoint } from "../lib/capacity";
 import { addDays, startOfWeek, startOfMonth } from "../lib/timeScale";
 
+import { Input } from "@/components/ui/input";
+
 type Bucket = "day" | "week" | "month";
 
 function todayISO(): string {
@@ -69,10 +71,17 @@ export default function CapacityForecast() {
           </select>
         </label>
         <label>Start:&nbsp;
-          <input type="date" value={start} onChange={e => setStart(e.target.value)} />
+          <Input type="date" value={start} onChange={e => setStart(e.target.value)} className="w-48" />
         </label>
         <label>Periods:&nbsp;
-          <input type="number" min={1} max={52} value={periods} onChange={e => setPeriods(Math.max(1, Math.min(52, Number(e.target.value))))} />
+          <Input
+            type="number"
+            min={1}
+            max={52}
+            value={periods}
+            onChange={e => setPeriods(Math.max(1, Math.min(52, Number(e.target.value))))}
+            className="w-28"
+          />
         </label>
       </div>
 
