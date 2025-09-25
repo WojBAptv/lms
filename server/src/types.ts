@@ -6,7 +6,7 @@ export const posInt = z.number().int().gt(0);
 // ISO date string (YYYY-MM-DD). We keep dates as day-level for M2.
 export const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD");
 
-// ACTIVITY (create payload)
+// -------------------- ACTIVITIES --------------------
 export const activityCreateSchema = z.object({
   projectId: posInt,                 // project ID as positive int
   description: z.string().min(1),    // required text
@@ -30,17 +30,36 @@ export const activitySchema = activityCreateSchema.extend({
 export type ActivityCreate = z.infer<typeof activityCreateSchema>;
 export type Activity = z.infer<typeof activitySchema>;
 
-// ---- minimal placeholders for later milestones ----
-export const programSchema = z.object({ id: posInt, name: z.string().min(1) });
+// -------------------- PROGRAMS --------------------
+// (Replace your previous programSchema placeholder with this pair)
+export const programCreateSchema = z.object({
+  name: z.string().min(1),
+  id: posInt.optional(),             // server assigns if omitted
+});
+export const programSchema = programCreateSchema.extend({
+  id: posInt,
+});
+export type ProgramCreate = z.infer<typeof programCreateSchema>;
 export type Program = z.infer<typeof programSchema>;
 
-export const projectSchema = z.object({ id: posInt, programId: posInt, name: z.string().min(1) });
+// -------------------- PROJECTS --------------------
+// (Replace your previous projectSchema placeholder with this pair)
+export const projectCreateSchema = z.object({
+  programId: posInt,
+  name: z.string().min(1),
+  id: posInt.optional(),             // server assigns if omitted
+});
+export const projectSchema = projectCreateSchema.extend({
+  id: posInt,
+});
+export type ProjectCreate = z.infer<typeof projectCreateSchema>;
 export type Project = z.infer<typeof projectSchema>;
 
+// -------------------- STAFF --------------------
 export const staffSchema = z.object({ id: posInt, name: z.string().min(1) });
 export type Staff = z.infer<typeof staffSchema>;
 
-// Legs (future)
+// -------------------- LEGS (future) --------------------
 export const legCreateSchema = z.object({
   projectId: posInt,
   name: z.string().min(1),

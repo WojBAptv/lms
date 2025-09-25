@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getActivities, updateActivity } from './lib/api'
 import Timeline, { type Activity as UIActivity } from './components/Timeline'
+import ProgramOverview from './components/ProgramOverview'
 import { useTimeScale, startOfWeek, startOfMonth, addDays, type ZoomMode } from './lib/timeScale'
+
+type Level = 'L1' | 'L2';
 
 export default function App() {
   const [items, setItems] = useState<UIActivity[]>([])
   const [error, setError] = useState<string|undefined>()
   const [saving, setSaving] = useState<string|null>(null)
   const [mode, setMode] = useState<ZoomMode>('day')
+  const [level, setLevel] = useState<Level>('L1')
 
   useEffect(() => {
     getActivities()
@@ -15,7 +19,6 @@ export default function App() {
       .catch(e => setError(String(e)))
   }, [])
 
-  // pick a window for each mode
   const todayISO = useMemo(() => {
     const d = new Date();
     const yyyy = d.getFullYear(); const mm = String(d.getMonth()+1).padStart(2,'0'); const dd = String(d.getDate()).padStart(2,'0');
@@ -25,17 +28,16 @@ export default function App() {
   const { startISO, endISO } = useMemo(() => {
     if (mode === 'day') {
       const start = startOfWeek(todayISO);
-      const end = addDays(start, 41); // ~6 weeks
+      const end = addDays(start, 41);
       return { startISO: start, endISO: end };
     }
     if (mode === 'week') {
       const start = startOfWeek(todayISO);
-      const end = addDays(start, 7 * 26); // ~half year
+      const end = addDays(start, 7 * 26);
       return { startISO: start, endISO: end };
     }
-    // month
     const start = startOfMonth(todayISO);
-    const end = addDays(start, 365); // ~12 months; ticks are month-based
+    const end = addDays(start, 365);
     return { startISO: start, endISO: end };
   }, [mode, todayISO]);
 
@@ -66,7 +68,11 @@ export default function App() {
   return (
     <div style={{ padding: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <h1 style={{ margin: 0 }}>Activities — Level 1</h1>
+        <h1 style={{ margin: 0 }}>Lab Management System</h1>
+        <div style={{ marginLeft: 16, display: 'flex', gap: 8 }}>
+          <button onClick={() => setLevel('L1')} disabled={level==='L1'}>Level 1: Activities</button>
+          <button onClick={() => setLevel('L2')} disabled={level==='L2'}>Level 2: Program Overview</button>
+        </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <button onClick={() => setMode('day')}   disabled={mode==='day'}>Day</button>
           <button onClick={() => setMode('week')}  disabled={mode==='week'}>Week</button>
@@ -79,15 +85,22 @@ export default function App() {
 
       {error && <p style={{color: 'red'}}>{error}</p>}
 
-      {byProject.map(([projectId, arr]) => (
-        <div key={projectId} style={{ marginBottom: 24 }}>
-          <h3 style={{ margin: '8px 0' }}>Project #{projectId}</h3>
-          <Timeline items={arr} scale={scale} onChange={handleChange} />
-        </div>
-      ))}
+      {level === 'L1' && (
+        <>
+          {byProject.map(([projectId, arr]) => (
+            <div key={projectId} style={{ marginBottom: 24 }}>
+              <h3 style={{ margin: '8px 0' }}>Project #{projectId}</h3>
+              <Timeline items={arr} scale={scale} onChange={handleChange} />
+            </div>
+          ))}
+          {!items.length && <p>No activities yet.</p>}
+          {saving && <p>Saving {saving}…</p>}
+        </>
+      )}
 
-      {!items.length && <p>No activities yet.</p>}
-      {saving && <p>Saving {saving}…</p>}
+      {level === 'L2' && (
+        <ProgramOverview activities={items} scale={scale} />
+      )}
     </div>
   )
 }
