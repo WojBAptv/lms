@@ -3,9 +3,11 @@ import { getActivities, updateActivity } from './lib/api'
 import Timeline, { type Activity as UIActivity } from './components/Timeline'
 import ProgramOverview from './components/ProgramOverview'
 import StaffPlan from './components/StaffPlan'
+import CapacityForecast from './components/CapacityForecast'
 import { useTimeScale, startOfWeek, startOfMonth, addDays, type ZoomMode } from './lib/timeScale'
 
-type Level = 'L1' | 'L2' | 'L3';
+type Level = 'L1' | 'L2' | 'L3' | 'L4';
+
 
 export default function App() {
   const [items, setItems] = useState<UIActivity[]>([])
@@ -74,6 +76,7 @@ export default function App() {
           <button onClick={() => setLevel('L1')} disabled={level==='L1'}>Level 1: Activities</button>
           <button onClick={() => setLevel('L2')} disabled={level==='L2'}>Level 2: Program Overview</button>
           <button onClick={() => setLevel('L3')} disabled={level==='L3'}>Level 3: Staff Plan</button>
+          <button onClick={() => setLevel('L4')} disabled={level==='L4'}>Level 4: Capacity</button>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <button onClick={() => setMode('day')}   disabled={mode==='day'}>Day</button>
@@ -106,6 +109,10 @@ export default function App() {
 
       {level === 'L3' && (
         <StaffPlan scale={scale} />
+      )}
+
+      {level === 'L4' && (
+        <CapacityForecast />
       )}
     </div>
   )
