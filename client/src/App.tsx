@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { getActivities, updateActivity } from './lib/api'
 import Timeline, { type Activity as UIActivity } from './components/Timeline'
 import ProgramOverview from './components/ProgramOverview'
+import StaffPlan from './components/StaffPlan'
 import { useTimeScale, startOfWeek, startOfMonth, addDays, type ZoomMode } from './lib/timeScale'
 
-type Level = 'L1' | 'L2';
+type Level = 'L1' | 'L2' | 'L3';
 
 export default function App() {
   const [items, setItems] = useState<UIActivity[]>([])
@@ -72,6 +73,7 @@ export default function App() {
         <div style={{ marginLeft: 16, display: 'flex', gap: 8 }}>
           <button onClick={() => setLevel('L1')} disabled={level==='L1'}>Level 1: Activities</button>
           <button onClick={() => setLevel('L2')} disabled={level==='L2'}>Level 2: Program Overview</button>
+          <button onClick={() => setLevel('L3')} disabled={level==='L3'}>Level 3: Staff Plan</button>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <button onClick={() => setMode('day')}   disabled={mode==='day'}>Day</button>
@@ -100,6 +102,10 @@ export default function App() {
 
       {level === 'L2' && (
         <ProgramOverview activities={items} scale={scale} onChange={handleChange} />
+      )}
+
+      {level === 'L3' && (
+        <StaffPlan scale={scale} />
       )}
     </div>
   )

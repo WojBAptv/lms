@@ -68,3 +68,22 @@ export const legCreateSchema = z.object({
 export const legSchema = legCreateSchema.extend({ id: posInt, uid: z.string().uuid() });
 export type LegCreate = z.infer<typeof legCreateSchema>;
 export type Leg = z.infer<typeof legSchema>;
+
+
+// -------------------- ASSIGNMENTS --------------------
+// For Level 3: rows per staff; assignments linked to project + staff
+export const assignmentCreateSchema = z.object({
+  staffId: posInt,
+  projectId: posInt,
+  start: isoDate,
+  end: isoDate,
+  notes: z.string().default("").optional(),
+  id: posInt.optional(), // server assigns if omitted
+});
+
+export const assignmentSchema = assignmentCreateSchema.extend({
+  id: posInt,
+});
+
+export type AssignmentCreate = z.infer<typeof assignmentCreateSchema>;
+export type Assignment = z.infer<typeof assignmentSchema>;

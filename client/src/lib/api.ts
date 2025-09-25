@@ -45,3 +45,41 @@ export async function getPrograms(): Promise<Program[]> {
 export async function getProjects(): Promise<Project[]> {
   return api<Project[]>('/api/projects');
 }
+
+// ---------- Staff ----------
+export type Staff = { id: number; name: string };
+
+export async function getStaff(): Promise<Staff[]> {
+  return api<Staff[]>('/api/staff');
+}
+
+export async function createStaff(name: string, id?: number): Promise<Staff> {
+  return api<Staff>('/api/staff', { method: 'POST', body: JSON.stringify({ name, id }) });
+}
+
+// ---------- Assignments ----------
+export type Assignment = {
+  id: number;
+  staffId: number;
+  projectId: number;
+  start: string; // YYYY-MM-DD
+  end: string;   // YYYY-MM-DD
+  notes?: string;
+};
+
+export async function getAssignments(): Promise<Assignment[]> {
+  return api<Assignment[]>('/api/assignments');
+}
+
+export async function updateAssignment(id: number, patch: Partial<Assignment>): Promise<Assignment> {
+  return api<Assignment>(`/api/assignments/${id}`, { method: 'PUT', body: JSON.stringify(patch) });
+}
+
+export async function createAssignment(a: Omit<Assignment, 'id'> & { id?: number }): Promise<Assignment> {
+  return api<Assignment>('/api/assignments', { method: 'POST', body: JSON.stringify(a) });
+}
+
+export async function deleteAssignment(id: number): Promise<void> {
+  await fetch(`/api/assignments/${id}`, { method: 'DELETE' });
+}
+
