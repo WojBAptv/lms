@@ -99,7 +99,7 @@ export default function App() {
       )}
 
       {level === 'L2' && (
-        <ProgramOverview activities={items} scale={scale} />
+        <ProgramOverview activities={items} scale={scale} onChange={handleChange} />
       )}
     </div>
   )
