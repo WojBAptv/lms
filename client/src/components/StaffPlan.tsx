@@ -133,20 +133,44 @@ useEffect(() => {
     const dx = ev.clientX - d.startClientX;
     const deltaUnits = Math.round(dx / px);
     const deltaDays = deltaUnits * uDays;
-    const hovered = staffRowAtY(ev.clientY) || d.origStaffId;
-    setDrag(prev => (prev ? { ...prev, deltaDays, hoverStaffId: hovered } : prev));
+
+    // Only allow vertical row change when moving the whole bar
+    const hovered =
+      d.mode === "move"
+        ? (staffRowAtY(ev.clientY) || d.origStaffId)
+        : d.origStaffId;
+
+    setDrag(prev =>
+      prev ? { ...prev, deltaDays, hoverStaffId: hovered } : prev
+    );
   }
 
   async function onUp() {
     setDrag(null);
 
-    const duration = daysBetween(d.origStart, d.origEnd);
-    const newStart = addDays(d.origStart, d.deltaDays);
-    const newEnd   = addDays(d.origStart, d.deltaDays + duration);
-    const patch: Partial<AssignmentT> = { start: newStart, end: newEnd };
-    if (d.hoverStaffId !== d.origStaffId) patch.staffId = d.hoverStaffId;
+    let patch: Partial<AssignmentT> = {};
+    if (d.mode === "move") {
+      const duration = daysBetween(d.origStart, d.origEnd);
+      patch.start = addDays(d.origStart, d.deltaDays);
+      patch.end   = addDays(d.origEnd,   d.deltaDays);
 
-    if (patch.staffId === undefined && d.deltaDays === 0) return; // no-op
+      if (d.hoverStaffId !== d.origStaffId) {
+        patch.staffId = d.hoverStaffId;
+      }
+    } else if (d.mode === "left") {
+      // change start only, keep end; enforce min 1-day width
+      const nextStart = addDays(d.origStart, d.deltaDays);
+      const minStart  = addDays(d.origEnd, -1); // end - 1 day
+      patch.start = nextStart <= minStart ? nextStart : minStart;
+    } else if (d.mode === "right") {
+      // change end only, keep start; enforce min 1-day width
+      const nextEnd = addDays(d.origEnd, d.deltaDays);
+      const minEnd  = addDays(d.origStart, 1); // start + 1 day
+      patch.end = nextEnd >= minEnd ? nextEnd : minEnd;
+    }
+
+    // no-op guard
+    if (!("start" in patch) && !("end" in patch) && !("staffId" in patch)) return;
 
     setSaving(d.id);
     try {
@@ -190,19 +214,48 @@ useEffect(() => {
 
   // Render one assignment bar
   function AssignmentBar({ a, rowTop, laneIndex }: { a: AssignmentT; rowTop: number; laneIndex: number }) {
-    const baseLeft = Math.round(scale.dateToX(a.start));
-    const baseRight = Math.round(scale.dateToX(addDays(a.end, 1))); // inclusive end
-    const baseW = Math.max(unitPx, baseRight - baseLeft);
-
     const dragging = drag && drag.id === a.id;
 
-    // Preview X
-    const previewLeft = dragging ? baseLeft + (drag.deltaDays / unitDays) * unitPx : baseLeft;
-    // Use original lane while on same staff; lane 0 when hovering another staff
-    const laneForPreview = dragging && drag!.hoverStaffId !== drag!.origStaffId ? 0 : laneIndex;
-    const previewTop = (dragging
-      ? (rowTopByStaff.get(drag!.hoverStaffId) ?? 0) + ROW_PAD_Y + laneForPreview * (LANE_H + LANE_GAP)
-      : rowTop + ROW_PAD_Y + laneIndex * (LANE_H + LANE_GAP));
+    // base geometry
+    const baseLeft  = Math.round(scale.dateToX(a.start));
+    const baseRight = Math.round(scale.dateToX(addDays(a.end, 1))); // inclusive end
+    const baseW     = Math.max(unitPx, baseRight - baseLeft);
+
+    // how many pixels one day represents (snap already handled in deltaDays)
+    const pxPerDay = unitPx / unitDays;
+
+    // compute preview geometry per mode
+    let previewLeft = baseLeft;
+    let previewW    = baseW;
+    let previewStaffId = a.staffId;
+
+    if (dragging) {
+      if (drag!.mode === "move") {
+        previewLeft = baseLeft + drag!.deltaDays * pxPerDay;
+        previewW    = baseW;
+        previewStaffId = drag!.hoverStaffId;
+      } else if (drag!.mode === "left") {
+        // left edge moves; width shrinks/expands from the left
+        const leftShift = drag!.deltaDays * pxPerDay;
+        previewLeft = baseLeft + leftShift;
+        previewW    = Math.max(unitPx, baseW - leftShift);
+      } else if (drag!.mode === "right") {
+        // right edge moves; width changes from the right
+        const rightShift = drag!.deltaDays * pxPerDay;
+        previewW    = Math.max(unitPx, baseW + rightShift);
+      }
+    }
+
+    // choose lane/row for preview
+    const laneForPreview =
+      dragging && (drag!.mode === "move") && (drag!.hoverStaffId !== drag!.origStaffId)
+        ? 0
+        : laneIndex;
+
+    const previewTop =
+      (dragging
+        ? (rowTopByStaff.get(previewStaffId) ?? 0)
+        : rowTop) + ROW_PAD_Y + laneForPreview * (LANE_H + LANE_GAP);
 
     function onPointerDown(e: React.PointerEvent, mode: 'move'|'left'|'right') {
       e.preventDefault(); // avoid text-selection / scroll quirks
@@ -224,7 +277,10 @@ useEffect(() => {
       <div
         style={{
           position: 'absolute',
-          left: previewLeft, top: previewTop, width: baseW, height: LANE_H,
+          left: previewLeft,
+          top: previewTop,
+          width: previewW,
+          height: LANE_H,
           background: '#c7f9cc', border: '1px solid #10b981', borderRadius: 6,
           display: 'flex', alignItems: 'center', boxSizing: 'border-box',
           zIndex: dragging ? 10 : 1, opacity: dragging ? 0.9 : 1, cursor: 'grab'
