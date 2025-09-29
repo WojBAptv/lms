@@ -6,6 +6,7 @@ import projectsRouter from "./routes/projects.js";
 import staffRouter from "./routes/staff.js";
 import assignmentsRouter from "./routes/assignments.js";
 import capacityRouter from "./routes/capacity.js";
+import timeEntriesRouter from "./routes/timeEntries.js";
 
 
 const app = express();
@@ -25,6 +26,8 @@ app.use("/api/staff", staffRouter);
 app.use("/api/assignments", assignmentsRouter);
 
 app.use("/api/capacity", capacityRouter);
+
+app.use("/api/time-entries", timeEntriesRouter);
 
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;

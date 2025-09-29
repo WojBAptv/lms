@@ -7,12 +7,21 @@ export type Activity = {
   projectId: number;
   description: string;
   type: string;
-  resource: string;
-  sequence: string;
-  legId?: number;
-  start: string; // YYYY-MM-DD
-  end: string;   // YYYY-MM-DD
+  resource?: string;
+  sequence?: string;
+  durationDays?: number;
+  finishedOn?: string; // YYYY-MM-DD
+  start?: string;
+  end?: string;
 };
+
+function todayISO(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 // Generic fetch helper
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
@@ -29,9 +38,11 @@ export async function api<T>(url: string, init?: RequestInit): Promise<T> {
 export async function getActivities(): Promise<Activity[]> {
   return api<Activity[]>('/api/activities');
 }
-
 export async function updateActivity(uid: string, patch: Partial<Activity>): Promise<Activity> {
   return api<Activity>(`/api/activities/${uid}`, { method: 'PUT', body: JSON.stringify(patch) });
+}
+export async function resequenceActivities(projectId: number, order: string[]): Promise<Activity[]> {
+  return api<Activity[]>(`/api/activities/reseq`, { method: 'POST', body: JSON.stringify({ projectId, order }) });
 }
 
 // ---------- Programs / Projects ----------
@@ -83,3 +94,37 @@ export async function deleteAssignment(id: number): Promise<void> {
   await fetch(`/api/assignments/${id}`, { method: 'DELETE' });
 }
 
+// ---------- Time Entries ----------
+export type TimeEntry = {
+  id: number;
+  activityUid: string;
+  projectId: number;
+  date: string;  // YYYY-MM-DD
+  hours: number;
+  staffId?: number;
+  note?: string;
+};
+
+export async function getTimeEntriesByProject(projectId: number): Promise<TimeEntry[]> {
+  return api<TimeEntry[]>(`/api/time-entries?projectId=${projectId}`);
+}
+export async function getTimeEntriesForActivity(activityUid: string): Promise<TimeEntry[]> {
+  return api<TimeEntry[]>(`/api/time-entries?activityUid=${activityUid}`);
+}
+export async function createTimeEntry(e: Omit<TimeEntry, 'id'>): Promise<TimeEntry> {
+  return api<TimeEntry>('/api/time-entries', { method: 'POST', body: JSON.stringify(e) });
+}
+export async function updateTimeEntry(id: number, patch: Partial<TimeEntry>): Promise<TimeEntry> {
+  return api<TimeEntry>(`/api/time-entries/${id}`, { method: 'PUT', body: JSON.stringify(patch) });
+}
+export async function deleteTimeEntry(id: number): Promise<void> {
+  await fetch(`/api/time-entries/${id}`, { method: 'DELETE' });
+}
+export async function createActivity(a: Omit<Activity, "uid" | "id"> & Partial<Pick<Activity, "start" | "end">>): Promise<Activity> {
+  const payload = {
+    ...a,
+    start: a.start ?? todayISO(),
+    end: a.end ?? todayISO(),
+  };
+  return api<Activity>("/api/activities", { method: "POST", body: JSON.stringify(payload) });
+}
