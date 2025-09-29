@@ -30,6 +30,11 @@ function toISODate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+// Type guard: ensure start/end are present and strings
+function hasDates(a: Activity): a is Activity & { start: string; end: string } {
+  return Boolean(a.start && a.end);
+}
+
 export default function ProgramOverview(props: Props) {
   // ---- window + mode (mode is parent-controlled) ----
   const mode: Mode = props.mode ?? "week";
@@ -103,9 +108,11 @@ export default function ProgramOverview(props: Props) {
     return map;
   }, [projects]);
 
+  // Activities grouped by project, but **only those with start/end** for timeline use
   const activitiesByProject = useMemo(() => {
-    const map = new Map<number, Activity[]>();
+    const map = new Map<number, (Activity & { start: string; end: string })[]>();
     for (const a of activitiesView) {
+      if (!hasDates(a)) continue; // skip undated activities for L2 timeline
       const arr = map.get(a.projectId) ?? [];
       arr.push(a);
       map.set(a.projectId, arr);
@@ -116,10 +123,10 @@ export default function ProgramOverview(props: Props) {
 
   // ---- drag handler: move an activity by N days ----
   async function handleDragDays(uid: string, deltaDays: number) {
-    // optimistic local update
+    // optimistic local update (guard for dates)
     setActivitiesView((prev) =>
       prev.map((a) =>
-        a.uid === uid
+        a.uid === uid && hasDates(a)
           ? { ...a, start: addDays(a.start, deltaDays), end: addDays(a.end, deltaDays) }
           : a
       )
@@ -127,7 +134,7 @@ export default function ProgramOverview(props: Props) {
     // server patch (best-effort)
     try {
       const a = activitiesRaw.find((x) => x.uid === uid);
-      if (!a) return;
+      if (!a || !hasDates(a)) return; // no dates to move
       const patch: Partial<Activity> = {
         start: addDays(a.start, deltaDays),
         end: addDays(a.end, deltaDays),
@@ -142,10 +149,10 @@ export default function ProgramOverview(props: Props) {
   }
 
   async function handleResizeDays(uid: string, edge: "start" | "end", deltaDays: number) {
-    // optimistic local update
-    setActivitiesView(prev =>
-      prev.map(a => {
-        if (a.uid !== uid) return a;
+    // optimistic local update (guard for dates)
+    setActivitiesView((prev) =>
+      prev.map((a) => {
+        if (a.uid !== uid || !hasDates(a)) return a;
         if (edge === "start") {
           return { ...a, start: addDays(a.start, deltaDays) };
         }
@@ -153,14 +160,14 @@ export default function ProgramOverview(props: Props) {
       })
     );
     try {
-      const a = activitiesRaw.find(x => x.uid === uid);
-      if (!a) return;
+      const a = activitiesRaw.find((x) => x.uid === uid);
+      if (!a || !hasDates(a)) return;
       const patch: Partial<Activity> =
         edge === "start"
           ? { start: addDays(a.start, deltaDays) }
           : { end: addDays(a.end, deltaDays) };
       await updateActivity(uid, patch);
-      setActivitiesRaw(prev => prev.map(x => (x.uid === uid ? { ...x, ...patch } : x)));
+      setActivitiesRaw((prev) => prev.map((x) => (x.uid === uid ? { ...x, ...patch } : x)));
     } catch {
       setActivitiesView(activitiesRaw); // rollback
     }
@@ -213,14 +220,15 @@ export default function ProgramOverview(props: Props) {
 
         if (!jExpanded) continue;
 
+        // Only activities with dates get a bar row
         for (const a of acts) {
           const aKey = `ACT:${a.uid}`;
           const bars: L2Bar[] = [
             {
               uid: a.uid,
               type: a.type,
-              startISO: a.start,
-              endISO: a.end,
+              startISO: a.start, // guaranteed string by hasDates
+              endISO: a.end,     // guaranteed string by hasDates
               label: `${a.description} • ${a.type ?? ""}`,
             },
           ];
@@ -264,14 +272,17 @@ export default function ProgramOverview(props: Props) {
         <TreeGrid
           rows={rows}
           rightHeader={<TimelineHeader scale={scale} />}
-          rightContentWidth={timelineWidth}   // ⬅ tell TreeGrid how wide the right side is
+          rightContentWidth={timelineWidth}   // tell TreeGrid how wide the right side is
         />
       </div>
     </div>
   );
 }
 
-function projectSummaryBars(acts: Activity[]): L2Bar[] {
+// Project summary from activities WITH dates
+function projectSummaryBars(
+  acts: (Activity & { start: string; end: string })[]
+): L2Bar[] {
   if (!acts.length) return [];
   const startISO = acts.reduce((m, a) => (a.start < m ? a.start : m), acts[0].start);
   const endISO = acts.reduce((m, a) => (a.end > m ? a.end : m), acts[0].end);
@@ -286,13 +297,14 @@ function projectSummaryBars(acts: Activity[]): L2Bar[] {
   ];
 }
 
+// Program summary aggregates only activities WITH dates across its projects
 function programSummaryBars(
   progId: number,
   projectsByProgram: Map<number, Project[]>,
-  activitiesByProject: Map<number, Activity[]>
+  activitiesByProject: Map<number, (Activity & { start: string; end: string })[]>
 ): L2Bar[] {
   const projs = projectsByProgram.get(progId) ?? [];
-  const acts: Activity[] = [];
+  const acts: (Activity & { start: string; end: string })[] = [];
   for (const p of projs) {
     const arr = activitiesByProject.get(p.id) ?? [];
     acts.push(...arr);
@@ -302,10 +314,9 @@ function programSummaryBars(
   const endISO   = acts.reduce((m, a) => (a.end   > m ? a.end   : m), acts[0].end);
   return [{
     uid: `program-summary:${progId}`,
-    type: "review",                    // purple in your legend
+    type: "review", // purple in your legend
     startISO,
     endISO,
     label: `Program span (${projs.length} projects)`,
   }];
 }
-

@@ -1,7 +1,8 @@
+// client/src/App.tsx
 import { useEffect, useMemo, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
-import { getActivities, updateActivity } from "./lib/api";
+import { getActivities, updateActivity, type Activity as ApiActivity } from "./lib/api";
 import Timeline, { type Activity as UIActivity } from "./components/Timeline";
 import ProgramOverview from "./components/ProgramOverview";
 import StaffPlan from "./components/StaffPlan";
@@ -9,14 +10,20 @@ import CapacityForecast from "./components/CapacityForecast";
 import { useTimeScale, startOfWeek, startOfMonth, addDays, type ZoomMode } from "./lib/timeScale";
 
 import { LayoutShell } from "./components/layout/LayoutShell";
-
-// 👇 shadcn/ui toast hook
 import { useToast } from "@/components/ui/use-toast";
-
-// If you created the Styleguide page in src/pages (Option A):
 import Styleguide from "./pages/Styleguide";
-
 import { Button } from "@/components/ui/button";
+
+import ProjectActivitiesEditor from "@/pages/ProjectActivitiesEditor";
+
+// ---- Mapper: API Activity -> UI Activity (fill required strings) ----
+const toUIActivity = (a: ApiActivity): UIActivity => ({
+  ...a,
+  resource: a.resource ?? "",
+  start: a.start ?? "",
+  end: a.end ?? "",
+  sequence: a.sequence ?? "",   // <-- add this line
+});
 
 // Small shared toolbar for zoom + window info
 function ZoomToolbar({
@@ -33,13 +40,25 @@ function ZoomToolbar({
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
       <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-        <Button variant={mode === "day" ? "default" : "outline"} onClick={() => setMode("day")} disabled={mode === "day"}>
+        <Button
+          variant={mode === "day" ? "default" : "outline"}
+          onClick={() => setMode("day")}
+          disabled={mode === "day"}
+        >
           Day
         </Button>
-        <Button variant={mode === "week" ? "default" : "outline"} onClick={() => setMode("week")} disabled={mode === "week"}>
+        <Button
+          variant={mode === "week" ? "default" : "outline"}
+          onClick={() => setMode("week")}
+          disabled={mode === "week"}
+        >
           Week
         </Button>
-        <Button variant={mode === "month" ? "default" : "outline"} onClick={() => setMode("month")} disabled={mode === "month"}>
+        <Button
+          variant={mode === "month" ? "default" : "outline"}
+          onClick={() => setMode("month")}
+          disabled={mode === "month"}
+        >
           Month
         </Button>
       </div>
@@ -56,13 +75,12 @@ export default function App() {
   const [saving, setSaving] = useState<string | null>(null);
   const [mode, setMode] = useState<ZoomMode>("day");
 
-  // toast API
   const { toast } = useToast();
 
   // Load activities once (shared for L1 and L2)
   useEffect(() => {
     getActivities()
-      .then(setItems)
+      .then((acts) => setItems(acts.map(toUIActivity)))
       .catch((e) => {
         const msg = String(e);
         setError(msg);
@@ -113,10 +131,12 @@ export default function App() {
   async function handleChange(uid: string, patch: Partial<UIActivity>) {
     setSaving(uid);
     try {
-      const updated = await updateActivity(uid, patch);
+      // Send patch to API; map the returned activity back to UI shape
+      const updatedApi = await updateActivity(uid, patch as Partial<ApiActivity>);
+      const updated = toUIActivity(updatedApi);
+
       setItems((prev) => prev.map((x) => (x.uid === uid ? updated : x)));
 
-      // Success toast
       toast({
         title: "Saved",
         description: `Activity ${uid} updated.`,
@@ -124,8 +144,6 @@ export default function App() {
     } catch (e: any) {
       const msg = String(e);
       setError(msg);
-
-      // Error toast
       toast({
         variant: "destructive",
         title: "Save failed",
@@ -145,7 +163,14 @@ export default function App() {
       {byProject.map(([projectId, arr]) => (
         <div key={projectId} style={{ marginBottom: 24 }}>
           <h3 style={{ margin: "8px 0" }}>Project #{projectId}</h3>
-          <Timeline items={arr} scale={scale} onChange={handleChange} />
+          <Timeline
+            items={arr}
+            scale={scale}
+            onChange={handleChange}
+            // If Timeline also expects a setter typed as (value: UIActivity[]) => void,
+            // uncomment the next line to avoid Dispatch<SetStateAction<...>> mismatch:
+            // setItems={(value) => setItems(value)}
+          />
         </div>
       ))}
 
@@ -184,7 +209,7 @@ export default function App() {
       <LayoutShell>
         <Routes>
           <Route path="/" element={<Navigate to="/l2" replace />} />
-          <Route path="/l1" element={L1Page} />
+          <Route path="/l1" element={<ProjectActivitiesEditor />} />
           <Route path="/l2" element={L2Page} />
           <Route path="/staff" element={StaffPage} />
           <Route path="/capacity" element={CapacityPage} />

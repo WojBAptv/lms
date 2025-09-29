@@ -17,14 +17,20 @@ export const activityCreateSchema = z.object({
   id: posInt.optional(),             // if omitted, server assigns next available within project
   legId: posInt.optional(),          // future feature
   start: isoDate.optional(),         // schedule start (YYYY-MM-DD)
-  end: isoDate.optional()            // schedule end (YYYY-MM-DD, inclusive)
+  end: isoDate.optional(),            // schedule end (YYYY-MM-DD, inclusive)
+
+  durationDays: z.number().int().gt(0).optional(),
+  finishedOn: isoDate.optional()
 });
 
 export const activitySchema = activityCreateSchema.extend({
   id: posInt,                        // order/index within the project (>=1)
   uid: z.string().uuid(),            // server unique id
   start: isoDate,                    // required once created
-  end: isoDate
+  end: isoDate,
+
+  durationDays: z.number().int().gt(0).optional(),
+  finishedOn: isoDate.optional()
 });
 
 export type ActivityCreate = z.infer<typeof activityCreateSchema>;
@@ -87,3 +93,21 @@ export const assignmentSchema = assignmentCreateSchema.extend({
 
 export type AssignmentCreate = z.infer<typeof assignmentCreateSchema>;
 export type Assignment = z.infer<typeof assignmentSchema>;
+
+
+// ---- Time Entries (M9) ----
+export const timeEntryCreateSchema = z.object({
+  activityUid: z.string().min(1),
+  projectId: posInt,
+  date: isoDate,
+  hours: z.number().gt(0).max(24),
+  staffId: posInt.optional(),
+  note: z.string().default("").optional(),
+});
+
+export const timeEntrySchema = timeEntryCreateSchema.extend({
+  id: posInt,
+});
+
+export type TimeEntryCreate = z.infer<typeof timeEntryCreateSchema>;
+export type TimeEntry = z.infer<typeof timeEntrySchema>;
