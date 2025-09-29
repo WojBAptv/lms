@@ -155,10 +155,13 @@ export default function App() {
   );
 
   const L2Page = (
-    <div>
-      <ZoomToolbar mode={mode} setMode={setMode} startISO={startISO} endISO={endISO} />
-      {error && <p style={{ color: "red" }}>{error}</p>}
-      <ProgramOverview activities={items} scale={scale} onChange={handleChange} />
+    <div className="h-[calc(100vh-56px)] flex flex-col">
+      <div className="mb-2">
+        <ZoomToolbar mode={mode} setMode={setMode} startISO={startISO} endISO={endISO} />
+      </div>
+      <div className="flex-1 min-h-0">
+        <ProgramOverview mode={mode} />
+      </div>
     </div>
   );
 
